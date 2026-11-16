@@ -24,6 +24,7 @@ import {
   host,
   openChat,
   request,
+  runtime,
   sendUserMessage,
   settleTurn,
   turnText
@@ -78,10 +79,10 @@ function dispatchCount(): unknown {
 }
 
 describe('a chat as the assignee of orchestration dispatch', () => {
-  it("holds the task as a card in a busy chat's queue, naming the Dispatch, and sends it when the turn ends", async () => {
+  it("shows a busy chat's full task with its sender, delivers only the pointer, and returns the task through check", async () => {
     await openChat(COORDINATOR)
     const worker = await openChat(PEER_CHAT)
-    const { runId, taskId } = await coordinatorRunAndTask()
+    const { taskId } = await coordinatorRunAndTask()
     const endTurn = await runningUserTurn(PEER_CHAT, worker)
 
     const result = await call(
@@ -104,14 +105,23 @@ describe('a chat as the assignee of orchestration dispatch', () => {
           }
         }
       ],
-      orchestration: { message: 'task', runId, taskId, dispatchId }
+      orchestration: { message: 'mail-notice', mailbox: `dispatch:${dispatchId}`, dispatchId }
     }
     // On the card's body: the turn the queue sends carries it, and the provider never sees it.
-    expect((await queuedRows(PEER_CHAT)).map((card) => card.body.from)).toMatchObject([from])
+    await vi.waitFor(async () => {
+      expect((await queuedRows(PEER_CHAT)).map((card) => card.body.from)).toMatchObject([from])
+    }, WAIT)
+    expect((await queuedCardTexts(PEER_CHAT)).join('')).toContain('build it')
 
     await endTurn()
     await vi.waitFor(() => expect(worker.turns).toHaveLength(2), WAIT)
-    expect(turnText(worker.turns[1]!)).toContain(dispatchId)
+    expect(turnText(worker.turns[1]!)).toMatch(/^You have 1 orchestration message\. Run `orca(-dev)? orchestration check`\.$/)
+    expect(worker.steers).toEqual([])
+    const checked = await call('orchestration.check', {}, { sessionId: PEER_CHAT })
+    expect(checked).toMatchObject({
+      count: 1,
+      messages: [{ subject: 'Task', body: expect.stringContaining('=== TASK ===\nbuild it') }]
+    })
     expect(await queuedCardTexts(PEER_CHAT)).toEqual([])
     expect(await taskSenders(PEER_CHAT)).toMatchObject([from])
   })
@@ -129,11 +139,14 @@ describe('a chat as the assignee of orchestration dispatch', () => {
     const dispatch = db.getDispatchContextById(idOf(result.dispatch))!
 
     const from = { kind: 'agent' as const, senders: [], orchestration: null }
-    const send = () => sendChatTask({ db, dispatch, from, preamble: 'the task' })
+    const send = () => sendChatTask({ db, runtime, dispatch, from, preamble: 'the task' })
     expect(await send()).toBe('queued')
     expect(await send()).toBe('queued')
 
-    expect(await queuedCardTexts(PEER_CHAT)).toEqual(['the task'])
+    await vi.waitFor(async () => {
+      expect(await queuedCardTexts(PEER_CHAT)).toEqual([expect.stringContaining('the task')])
+    }, WAIT)
+    expect(db.getUnreadMessages(`dispatch:${dispatch.id}`)).toHaveLength(1)
     await endTurn()
   })
 
@@ -143,14 +156,13 @@ describe('a chat as the assignee of orchestration dispatch', () => {
     const { taskId } = await coordinatorRunAndTask()
     providerFaults.dieBeforeEveryEcho = true
 
-    const error = await refusal(
+    expect(await call(
       'orchestration.dispatch',
       { task: taskId, to: WORKER, inject: true },
-      COORDINATOR
-    )
+      { sessionId: COORDINATOR }
+    )).toMatchObject({ injected: true })
 
-    expect(error).toMatchObject({ code: 'operation_unknown' })
-    expect(worker.turns.length).toBeGreaterThan(0)
+    await vi.waitFor(() => expect(worker.turns).toHaveLength(1), WAIT)
     expect(db.db.prepare('SELECT status FROM dispatch_contexts').all()).toEqual([
       { status: 'dispatched' }
     ])

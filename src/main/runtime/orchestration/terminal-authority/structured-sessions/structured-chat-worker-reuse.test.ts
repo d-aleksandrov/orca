@@ -232,7 +232,12 @@ describe('a send to a finished structured worker', () => {
       ]),
       state: 'ready'
     })
-    expect(turnText(worker.turns[0]!)).toContain('and the docs')
+    expect(isMailPointer(turnText(worker.turns[0]!))).toBe(true)
+    expect(await call('orchestration.check', {}, { sessionId: identity.sessionId })).toMatchObject({
+      messages: expect.arrayContaining([expect.objectContaining({
+        subject: 'Task', body: expect.stringContaining('and the docs')
+      })])
+    })
     expect(steered).toMatchObject({
       message: { to_handle: `dispatch:${String(followUp.dispatchId)}` }
     })
@@ -264,7 +269,10 @@ describe('a send to a finished structured worker', () => {
     worker.handlers.onNotification?.('turn/completed', { turn: { id: 'turn-1' } })
     await host.flushStreamedEvents(identity.sessionId)
     await vi.waitFor(() => expect(worker.turns.length).toBeGreaterThan(1), WAIT)
-    expect(worker.turns.map(turnText).join('\n')).toContain('and the docs')
+    expect(worker.turns.slice(1).map(turnText).every(isMailPointer)).toBe(true)
+    expect(await call('orchestration.check', {}, { sessionId: identity.sessionId })).toMatchObject({
+      messages: [expect.objectContaining({ subject: 'Task', body: expect.stringContaining('and the docs') })]
+    })
   })
 
   it('after it was closed, reopens its chat in the same conversation', async () => {
@@ -351,6 +359,7 @@ describe('a send to a finished structured worker', () => {
 
       const followUp = getFollowUpDispatch(db, firstDispatchId)!
       expect(db.getUnreadMessages(`dispatch:${followUp.id}`)).toMatchObject([
+        { subject: 'Task', body: expect.stringContaining('and the docs') },
         { body: 'and the docs' }
       ])
       expect(db.getUnreadMessages(`dispatch:${firstDispatchId}`)).toEqual([])

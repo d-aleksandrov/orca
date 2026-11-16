@@ -81,7 +81,7 @@ export async function deliverWorkerDispatchPreamble(args: {
       )
     }
     const from = workerTaskSource(args)
-    const delivery = await sendChatTask({ db: args.db, dispatch, from, preamble })
+    const delivery = await sendChatTask({ db: args.db, runtime, dispatch, from, preamble })
     return { structuredTurnStart: chatTaskTurnStart(delivery) }
   }
   if (structuredSession) {
@@ -124,15 +124,6 @@ export async function deliverWorkerDispatchPreamble(args: {
 
 function chatTaskTurnStart(delivery: ChatTaskDelivery): WorkerTurnStartObservation {
   switch (delivery) {
-    case 'accepted':
-      return { verdict: 'observed' }
-    case 'pending':
-      return {
-        verdict: 'unobserved',
-        reason:
-          "The task was accepted, but the chat's agent had not started to take it. If the worker " +
-          'then reports, this Dispatch settles normally.'
-      }
     case 'queued':
       return {
         verdict: 'unobserved',
@@ -140,7 +131,7 @@ function chatTaskTurnStart(delivery: ChatTaskDelivery): WorkerTurnStartObservati
         reason:
           "The task is waiting as a card in the chat's queue and is sent when the queue reaches " +
           'it. If the worker then reports, this Dispatch settles normally. worker-abandon ' +
-          'settles the Dispatch but does not remove the card from the chat.'
+          'settles the Dispatch.'
       }
   }
 }

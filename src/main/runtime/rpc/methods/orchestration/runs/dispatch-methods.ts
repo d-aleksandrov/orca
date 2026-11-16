@@ -2,7 +2,7 @@ import { defineOrchestrationMethod } from '../access/orchestration-method-access
 import { dispatchAccess } from '../access/run-access-rules'
 import { OrchestrationError } from '../../../../orchestration/orchestration-error'
 import { buildDispatchPreamble } from '../../../../orchestration/workers/launch/worker-dispatch-preamble'
-import { sendAgentTurn } from '../../../../orchestration/turn-delivery/send-agent-turn'
+import { queueDispatchTask } from '../../../../orchestration/coordinator/dispatch/queue-dispatch-task'
 import { resolveDispatchCreator } from './dispatch-creator'
 import {
   injectRejectedError,
@@ -37,7 +37,7 @@ export const ORCHESTRATION_DISPATCH_METHODS = [
     },
     handler: async (
       params,
-      { orchestrationCaller, runtime, revalidateLegacyCoordinator, orchestrationMutation },
+      { orchestrationCaller, runtime, revalidateLegacyCoordinator },
       { task }
     ) => {
       const db = runtime.getOrchestrationDb()
@@ -160,7 +160,6 @@ export const ORCHESTRATION_DISPATCH_METHODS = [
       })
 
       let injected = false
-      let prompt
       if (params.inject) {
         try {
           if (chatAssignee) {
@@ -171,17 +170,14 @@ export const ORCHESTRATION_DISPATCH_METHODS = [
               senderSnapshot: (party, reported) =>
                 runtime.orchestrationSenderNames.snapshotOf(party, reported)
             })
-            await sendChatTask({ db, dispatch: ctx, from, preamble })
+            await sendChatTask({ db, runtime, dispatch: ctx, from, preamble })
           } else {
-            prompt = await sendAgentTurn({
-              kind: 'terminal',
+            queueDispatchTask({
+              db,
               runtime,
-              handle: to,
-              turn: {
-                purpose: 'dispatch-preamble',
-                body: preamble,
-                operationId: orchestrationMutation?.requestId ?? ctx.id
-              }
+              dispatch: ctx,
+              from: params.from ?? 'coordinator',
+              preamble
             })
           }
           injected = true
@@ -199,11 +195,10 @@ export const ORCHESTRATION_DISPATCH_METHODS = [
         return {
           dispatch: ctx,
           injected,
-          preamble,
-          ...(prompt?.prompt ? { prompt: prompt.prompt } : {})
+          preamble
         }
       }
-      return { dispatch: ctx, injected, ...(prompt?.prompt ? { prompt: prompt.prompt } : {}) }
+      return { dispatch: ctx, injected }
     }
   }),
 
