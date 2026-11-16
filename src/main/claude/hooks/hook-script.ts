@@ -94,7 +94,9 @@ export function getManagedScript(
         ]
       : []),
     ...buildPosixClaudeBackgroundJobGuardLines(),
-    ...(source === 'claude' ? buildHookProcessCapture() : []),
+    ...buildPosixHookMetadataCacheLines(),
+    // Every Claude process starts with SessionStart (startup, resume, clear, compact).
+    ...(source === 'claude' ? buildHookProcessCapture({ refreshOnEvent: 'SessionStart' }) : []),
     // Surviving PTYs need fresh endpoint coordinates; suppress errors and survive outer set -e.
     'if [ -n "$ORCA_AGENT_HOOK_ENDPOINT" ] && [ -r "$ORCA_AGENT_HOOK_ENDPOINT" ]; then',
     '  unset ORCA_AGENT_HOOK_TRANSPORT',
@@ -104,7 +106,6 @@ export function getManagedScript(
     '  spool_hook_event',
     '  exit 0',
     'fi',
-    ...buildPosixHookMetadataCacheLines(),
     // Keep hook JSON off argv and avoid URL-encoded paths that trigger IDS rules.
     ...(decides
       ? wrapPosixClaudeDecisionPost(
