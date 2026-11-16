@@ -152,6 +152,7 @@ export async function deliverAndSettleWorkerStartReadiness(args: {
   const worker = alreadySettled
     ? currentWorker
     : db.markWorkerDispatchReady(args.dispatchId, effects)
+  runtime.notifyMessageArrived(`dispatch:${args.dispatchId}`, 'status')
   const reportedOutcome = reportedWorkerOutcome(worker)
   return {
     runId: run.id,

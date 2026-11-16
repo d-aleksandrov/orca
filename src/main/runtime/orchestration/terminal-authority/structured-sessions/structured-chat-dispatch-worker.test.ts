@@ -111,7 +111,7 @@ describe('a chat as the assignee of orchestration dispatch', () => {
     await vi.waitFor(async () => {
       expect((await queuedRows(PEER_CHAT)).map((card) => card.body.from)).toMatchObject([from])
     }, WAIT)
-    expect((await queuedCardTexts(PEER_CHAT)).join('')).toContain('build it')
+    expect(JSON.stringify(await queuedRows(PEER_CHAT))).toContain('build it')
 
     await endTurn()
     await vi.waitFor(() => expect(worker.turns).toHaveLength(2), WAIT)
@@ -144,7 +144,7 @@ describe('a chat as the assignee of orchestration dispatch', () => {
     expect(await send()).toBe('queued')
 
     await vi.waitFor(async () => {
-      expect(await queuedCardTexts(PEER_CHAT)).toEqual([expect.stringContaining('the task')])
+      expect(await queuedRows(PEER_CHAT)).toMatchObject([{ body: { blocks: [{ type: 'text', text: expect.stringContaining('the task') }] } }])
     }, WAIT)
     expect(db.getUnreadMessages(`dispatch:${dispatch.id}`)).toHaveLength(1)
     await endTurn()

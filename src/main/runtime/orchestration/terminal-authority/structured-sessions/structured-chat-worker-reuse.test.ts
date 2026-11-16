@@ -359,8 +359,8 @@ describe('a send to a finished structured worker', () => {
 
       const followUp = getFollowUpDispatch(db, firstDispatchId)!
       expect(db.getUnreadMessages(`dispatch:${followUp.id}`)).toMatchObject([
-        { subject: 'Task', body: expect.stringContaining('and the docs') },
-        { body: 'and the docs' }
+        { body: 'and the docs' },
+        { subject: 'Task', body: expect.stringContaining('check') }
       ])
       expect(db.getUnreadMessages(`dispatch:${firstDispatchId}`)).toEqual([])
     } finally {
