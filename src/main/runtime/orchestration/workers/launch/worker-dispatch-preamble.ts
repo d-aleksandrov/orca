@@ -133,11 +133,11 @@ export function dispatchPreambleSendOptions(requestId: string): DispatchPreamble
   }
 }
 
-export const TERMINAL_REDISPATCH_PARAGRAPH = `Do not exit the shell. More supervised work arrives here as a fresh preamble
-and TASK block; follow it under its new Dispatch.`
+export const TERMINAL_REDISPATCH_PARAGRAPH = `Do not exit the shell. More supervised work arrives here through orchestration mail.
+When Orca points you at \`check\`, read it and follow the task under its new Dispatch.`
 
-export const CHAT_REDISPATCH_PARAGRAPH = `More supervised work arrives in this chat as a fresh preamble and TASK
-block; follow it under its new Dispatch.`
+export const CHAT_REDISPATCH_PARAGRAPH = `More supervised work arrives in this chat through orchestration mail.
+When Orca points you at \`check\`, read it and follow the task under its new Dispatch.`
 
 function buildPostWorkerDoneInstructions({
   cli,

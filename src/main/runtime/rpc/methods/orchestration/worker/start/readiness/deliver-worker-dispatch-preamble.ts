@@ -12,6 +12,7 @@ import {
 } from '../../../../../../orchestration/addressing/orchestration-party'
 import { buildDispatchPreamble } from '../../../../../../orchestration/workers/launch/worker-dispatch-preamble'
 import { sendAgentTurn } from '../../../../../../orchestration/turn-delivery/send-agent-turn'
+import { queueDispatchTask } from '../../../../../../orchestration/coordinator/dispatch/queue-dispatch-task'
 import { createWorkerBriefWriteGuard } from '../../../../../../terminal/wait/launched-agent-write-guard'
 import { sendStructuredWorkerPreamble } from '../../../structured-workers/orchestration-structured-worker-session'
 import { chatAssigneeOf } from '../../../chat-assignee-admission'
@@ -105,6 +106,14 @@ export async function deliverWorkerDispatchPreamble(args: {
                 'settles normally.'
             }
     }
+  }
+  if (!args.launchedAgent) {
+    const dispatch = args.db.getDispatchContextById(args.dispatchId)
+    if (!dispatch) {
+      throw new OrchestrationError('dispatch_not_found', `Dispatch ${args.dispatchId} was not found.`)
+    }
+    queueDispatchTask({ db: args.db, runtime, dispatch, from: args.coordinatorHandle, preamble })
+    return {}
   }
   // A shell back at its prompt also reads as ready, so the brief needs the agent found in front.
   const briefGuard = createWorkerBriefWriteGuard(runtime, args.launchedAgent, !!args.launchedAgent)
